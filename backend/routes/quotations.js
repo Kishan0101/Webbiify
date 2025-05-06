@@ -13,6 +13,19 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
+router.get('/:id', auth, async (req, res) => {
+  try {
+    const quotation = await Quotation.findById(req.params.id);
+    if (!quotation) {
+      return res.status(404).json({ message: 'Quotation not found' });
+    }
+    res.json(quotation);
+  } catch (error) {
+    console.error('Error fetching quotation details:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 router.post('/', auth, async (req, res) => {
   console.log('Received quotation data:', req.body);
   console.log('req.user:', req.user);
@@ -146,7 +159,7 @@ router.delete('/:id', auth, async (req, res) => {
       return res.status(404).json({ message: 'Quotation not found' });
     }
 
-    await Quotation.findByIdAndDelete(req.params.id); // Updated to use findByIdAndDelete
+    await Quotation.findByIdAndDelete(req.params.id);
     res.json({ message: 'Quotation deleted successfully' });
   } catch (error) {
     console.error('Error deleting quotation:', error);
