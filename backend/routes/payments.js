@@ -6,6 +6,7 @@ const auth = require('../middleware/auth');
 router.get('/', auth, async (req, res) => {
   try {
     const payments = await Payment.find().sort({ createdAt: -1 });
+    console.log('Fetched payments:', payments);
     res.json(payments);
   } catch (error) {
     console.error('Error fetching payments:', error);

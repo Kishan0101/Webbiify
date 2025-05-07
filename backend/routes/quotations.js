@@ -88,6 +88,7 @@ router.post('/', auth, async (req, res) => {
 
     // If status is "Accepted", auto-generate a payment
     if (status === 'Accepted') {
+      console.log('Status is Accepted, creating payment for quotation:', quotation._id);
       const payment = new Payment({
         quotationId: quotation._id,
         customerName: client,
@@ -97,6 +98,7 @@ router.post('/', auth, async (req, res) => {
         createdBy: req.user.userId,
       });
       await payment.save();
+      console.log('Payment created:', payment);
     }
 
     res.status(201).json(quotation);
@@ -147,6 +149,7 @@ router.put('/:id', auth, async (req, res) => {
     // Check if status is changing to "Accepted"
     const wasAccepted = quotation.status === 'Accepted';
     const isNowAccepted = status === 'Accepted';
+    console.log('Previous status:', quotation.status, 'New status:', status);
 
     // Update fields
     quotation.number = number;
@@ -166,6 +169,7 @@ router.put('/:id', auth, async (req, res) => {
 
     // If status changed to "Accepted" and wasn't previously "Accepted", create a payment
     if (isNowAccepted && !wasAccepted) {
+      console.log('Status changed to Accepted, checking for existing payment for quotation:', quotation._id);
       const existingPayment = await Payment.findOne({ quotationId: quotation._id });
       if (!existingPayment) {
         const payment = new Payment({
@@ -177,6 +181,9 @@ router.put('/:id', auth, async (req, res) => {
           createdBy: req.user.userId,
         });
         await payment.save();
+        console.log('Payment created:', payment);
+      } else {
+        console.log('Payment already exists for this quotation:', existingPayment);
       }
     }
 
