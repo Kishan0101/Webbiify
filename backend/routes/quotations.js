@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Quotation = require('../models/Quotation');
+const Payment = require('../models/Payment');
 const auth = require('../middleware/auth');
 
 router.get('/', auth, async (req, res) => {
@@ -60,7 +61,6 @@ router.post('/', auth, async (req, res) => {
   }
 
   try {
-    // Generate QuotationNo
     const lastQuotation = await Quotation.findOne().sort({ createdAt: -1 });
     let newQuotationNo = 'WI0001';
     if (lastQuotation && lastQuotation.quotationNo) {
@@ -85,6 +85,20 @@ router.post('/', auth, async (req, res) => {
       createdBy: req.user.userId,
     });
     await quotation.save();
+
+    // If status is "Accepted", auto-generate a payment
+    if (status === 'Accepted') {
+      const payment = new Payment({
+        quotationId: quotation._id,
+        customerName: client,
+        amount: total,
+        date: new Date(),
+        status: 'Pending',
+        createdBy: req.user.userId,
+      });
+      await payment.save();
+    }
+
     res.status(201).json(quotation);
   } catch (error) {
     console.error('Error saving quotation:', error);
@@ -130,7 +144,11 @@ router.put('/:id', auth, async (req, res) => {
       return res.status(404).json({ message: 'Quotation not found' });
     }
 
-    // Update fields, excluding quotationNo and createdBy
+    // Check if status is changing to "Accepted"
+    const wasAccepted = quotation.status === 'Accepted';
+    const isNowAccepted = status === 'Accepted';
+
+    // Update fields
     quotation.number = number;
     quotation.client = client;
     quotation.date = date;
@@ -145,6 +163,23 @@ router.put('/:id', auth, async (req, res) => {
     quotation.note = note;
 
     await quotation.save();
+
+    // If status changed to "Accepted" and wasn't previously "Accepted", create a payment
+    if (isNowAccepted && !wasAccepted) {
+      const existingPayment = await Payment.findOne({ quotationId: quotation._id });
+      if (!existingPayment) {
+        const payment = new Payment({
+          quotationId: quotation._id,
+          customerName: client,
+          amount: total,
+          date: new Date(),
+          status: 'Pending',
+          createdBy: req.user.userId,
+        });
+        await payment.save();
+      }
+    }
+
     res.json(quotation);
   } catch (error) {
     console.error('Error updating quotation:', error);
@@ -159,8 +194,10 @@ router.delete('/:id', auth, async (req, res) => {
       return res.status(404).json({ message: 'Quotation not found' });
     }
 
+    // Delete associated payments
+    await Payment.deleteMany({ quotationId: req.params.id });
     await Quotation.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Quotation deleted successfully' });
+    res.json({ message: 'Quotation and associated payments deleted successfully' });
   } catch (error) {
     console.error('Error deleting quotation:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
