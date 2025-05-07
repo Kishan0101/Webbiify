@@ -89,6 +89,7 @@ router.post('/', auth, async (req, res) => {
     // If status is "Accepted", auto-generate a payment
     if (status === 'Accepted') {
       console.log('Status is Accepted, creating payment for quotation:', quotation._id);
+      console.log('Creating payment with customerName:', client, 'amount:', total, 'createdBy:', req.user.userId);
       const payment = new Payment({
         quotationId: quotation._id,
         customerName: client,
@@ -97,8 +98,12 @@ router.post('/', auth, async (req, res) => {
         status: 'Pending',
         createdBy: req.user.userId,
       });
-      await payment.save();
-      console.log('Payment created:', payment);
+      try {
+        await payment.save();
+        console.log('Payment created:', payment);
+      } catch (paymentError) {
+        console.error('Error saving payment:', paymentError);
+      }
     }
 
     res.status(201).json(quotation);
@@ -172,6 +177,7 @@ router.put('/:id', auth, async (req, res) => {
       console.log('Status changed to Accepted, checking for existing payment for quotation:', quotation._id);
       const existingPayment = await Payment.findOne({ quotationId: quotation._id });
       if (!existingPayment) {
+        console.log('Creating payment with customerName:', client, 'amount:', total, 'createdBy:', req.user.userId);
         const payment = new Payment({
           quotationId: quotation._id,
           customerName: client,
@@ -180,8 +186,12 @@ router.put('/:id', auth, async (req, res) => {
           status: 'Pending',
           createdBy: req.user.userId,
         });
-        await payment.save();
-        console.log('Payment created:', payment);
+        try {
+          await payment.save();
+          console.log('Payment created:', payment);
+        } catch (paymentError) {
+          console.error('Error saving payment:', paymentError);
+        }
       } else {
         console.log('Payment already exists for this quotation:', existingPayment);
       }

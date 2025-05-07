@@ -5,12 +5,34 @@ const auth = require('../middleware/auth');
 
 router.get('/', auth, async (req, res) => {
   try {
+    const paymentCount = await Payment.countDocuments();
+    console.log('Total payments in database:', paymentCount);
     const payments = await Payment.find().sort({ createdAt: -1 });
     console.log('Fetched payments:', payments);
     res.json(payments);
   } catch (error) {
     console.error('Error fetching payments:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Temporary endpoint to create a test payment
+router.post('/test', auth, async (req, res) => {
+  try {
+    const payment = new Payment({
+      quotationId: '680d305b2325bb3652334ce6', // Use a valid quotationId or replace with an existing one
+      customerName: 'Test Customer',
+      amount: 5000,
+      date: new Date(),
+      status: 'Pending',
+      createdBy: req.user.userId,
+    });
+    await payment.save();
+    console.log('Test payment created:', payment);
+    res.status(201).json(payment);
+  } catch (error) {
+    console.error('Error creating test payment:', error);
+    res.status(500).json({ message: 'Error creating test payment', error: error.message });
   }
 });
 
