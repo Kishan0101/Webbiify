@@ -3,6 +3,7 @@ const router = express.Router();
 const Payment = require('../models/Payment');
 const auth = require('../middleware/auth');
 
+// GET all payments
 router.get('/', auth, async (req, res) => {
   try {
     const paymentCount = await Payment.countDocuments();
@@ -13,6 +14,61 @@ router.get('/', auth, async (req, res) => {
   } catch (error) {
     console.error('Error fetching payments:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// POST to create a new payment
+router.post('/', auth, async (req, res) => {
+  try {
+    const {
+      quotationId,
+      customerName,
+      companyName,
+      address,
+      phone,
+      quotationNo,
+      items,
+      subTotal,
+      tax,
+      total,
+      status,
+      year,
+      currency,
+      amount,
+      date,
+    } = req.body;
+
+    // Validate required fields
+    if (!quotationId || !customerName || !amount || !date) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    // Create new payment
+    const payment = new Payment({
+      quotationId,
+      customerName,
+      companyName,
+      address,
+      phone,
+      quotationNo,
+      items: items || [],
+      subTotal: parseFloat(subTotal) || 0,
+      tax: parseFloat(tax) || 0,
+      total: parseFloat(total) || 0,
+      status: status || 'Pending',
+      year,
+      currency,
+      amount: parseFloat(amount),
+      date: new Date(date),
+      createdBy: req.user.userId,
+    });
+
+    await payment.save();
+    console.log('Payment created:', payment);
+    res.status(201).json(payment);
+  } catch (error) {
+    console.error('Error creating payment:', error);
+    res.status(500).json({ message: 'Error creating payment', error: error.message });
   }
 });
 
@@ -36,6 +92,7 @@ router.post('/test', auth, async (req, res) => {
   }
 });
 
+// GET a single payment by ID
 router.get('/:id', auth, async (req, res) => {
   try {
     const payment = await Payment.findById(req.params.id);
@@ -49,6 +106,7 @@ router.get('/:id', auth, async (req, res) => {
   }
 });
 
+// PUT to update a payment
 router.put('/:id', auth, async (req, res) => {
   try {
     const { customerName, amount, date, status, razorpayPaymentId } = req.body;
@@ -71,6 +129,7 @@ router.put('/:id', auth, async (req, res) => {
   }
 });
 
+// DELETE a payment
 router.delete('/:id', auth, async (req, res) => {
   try {
     const payment = await Payment.findById(req.params.id);
