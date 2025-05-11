@@ -6,10 +6,13 @@ const PaymentSchema = new mongoose.Schema({
     ref: 'Quotation',
     required: true,
   },
+  customerName: {
+    type: String,
+    required: true,
+  },
   amount: {
     type: Number,
     required: true,
-    min: 0,
   },
   date: {
     type: Date,
@@ -22,11 +25,9 @@ const PaymentSchema = new mongoose.Schema({
   },
   razorpayOrderId: {
     type: String,
-    required: false,
   },
   razorpayPaymentId: {
     type: String,
-    required: false,
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
