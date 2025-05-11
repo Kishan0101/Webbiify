@@ -1,13 +1,53 @@
 const express = require('express');
 const router = express.Router();
 const Payment = require('../models/Payment');
+const Quotation = require('../models/Quotation');
 const auth = require('../middleware/auth');
+
+// Get unique customers from quotations
+router.get('/customers', auth, async (req, res) => {
+  try {
+    const customers = await Quotation.distinct('client');
+    res.status(200).json(customers);
+  } catch (error) {
+    console.error('Error fetching customers:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Get quotations by customer name
+router.get('/quotations/:customerName', auth, async (req, res) => {
+  try {
+    const quotations = await Quotation.find({ client: req.params.customerName }).select('_id number client total');
+    res.status(200).json(quotations);
+  } catch (error) {
+    console.error('Error fetching quotations:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// Get all payments for a customer
+router.get('/customer/:customerName', auth, async (req, res) => {
+  try {
+    const quotations = await Quotation.find({ client: req.params.customerName }).select('_id');
+    const quotationIds = quotations.map((q) => q._id);
+    const payments = await Payment.find({ quotationId: { $in: quotationIds } })
+      .populate('quotationId', 'client number total')
+      .populate('createdBy', 'name email')
+      .sort({ createdAt: -1 });
+    res.status(200).json(payments);
+  } catch (error) {
+    console.error('Error fetching payments for customer:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
 
 // Get all payments
 router.get('/', auth, async (req, res) => {
   try {
     const payments = await Payment.find()
-      .populate('createdBy', 'name email') // Optionally populate createdBy for user details
+      .populate('quotationId', 'client number total')
+      .populate('createdBy', 'name email')
       .sort({ createdAt: -1 });
     res.status(200).json(payments);
   } catch (error) {
@@ -19,7 +59,9 @@ router.get('/', auth, async (req, res) => {
 // Get a single payment by ID
 router.get('/:id', auth, async (req, res) => {
   try {
-    const payment = await Payment.findById(req.params.id).populate('createdBy', 'name email');
+    const payment = await Payment.findById(req.params.id)
+      .populate('quotationId', 'client number total')
+      .populate('createdBy', 'name email');
     if (!payment) {
       return res.status(404).json({ message: 'Payment not found' });
     }
@@ -34,11 +76,13 @@ router.get('/:id', auth, async (req, res) => {
 router.post('/', auth, async (req, res) => {
   console.log('Received payment data:', req.body);
   console.log('req.user:', req.user);
-  const { customerName, amount, date, status, razorpayOrderId, razorpayPaymentId } = req.body;
+  const { quotationId, amount, date, status, razorpayOrderId, razorpayPaymentId } = req.body;
 
   // Validate required fields
-  if (!customerName || amount == null || !date || !status) {
-    return res.status(400).json({ message: 'All required fields (customerName, amount, date, status) must be provided' });
+  if (!quotationId || amount == null || !date || !status) {
+    return res.status(400).json({
+      message: 'All required fields (quotationId, amount, date, status) must be provided',
+    });
   }
 
   // Validate amount
@@ -56,14 +100,20 @@ router.post('/', auth, async (req, res) => {
     return res.status(400).json({ message: 'Status must be one of: Pending, Completed, Failed' });
   }
 
+  // Validate quotationId
+  const quotation = await Quotation.findById(quotationId);
+  if (!quotation) {
+    return res.status(400).json({ message: 'Invalid quotation ID' });
+  }
+
   try {
     const payment = new Payment({
-      customerName,
+      quotationId,
       amount,
       date: new Date(date),
       status,
-      razorpayOrderId: razorpayOrderId || null, // Handle optional field
-      razorpayPaymentId: razorpayPaymentId || null, // Handle optional field
+      razorpayOrderId: razorpayOrderId || null,
+      razorpayPaymentId: razorpayPaymentId || null,
       createdBy: req.user.userId,
     });
     await payment.save();
@@ -78,11 +128,13 @@ router.post('/', auth, async (req, res) => {
 // Update a payment
 router.put('/:id', auth, async (req, res) => {
   console.log('Received update payment data:', req.body);
-  const { customerName, amount, date, status, razorpayOrderId, razorpayPaymentId } = req.body;
+  const { quotationId, amount, date, status, razorpayOrderId, razorpayPaymentId } = req.body;
 
   // Validate required fields
-  if (!customerName || amount == null || !date || !status) {
-    return res.status(400).json({ message: 'All required fields (customerName, amount, date, status) must be provided' });
+  if (!quotationId || amount == null || !date || !status) {
+    return res.status(400).json({
+      message: 'All required fields (quotationId, amount, date, status) must be provided',
+    });
   }
 
   // Validate amount
@@ -100,6 +152,12 @@ router.put('/:id', auth, async (req, res) => {
     return res.status(400).json({ message: 'Status must be one of: Pending, Completed, Failed' });
   }
 
+  // Validate quotationId
+  const quotation = await Quotation.findById(quotationId);
+  if (!quotation) {
+    return res.status(400).json({ message: 'Invalid quotation ID' });
+  }
+
   try {
     const payment = await Payment.findById(req.params.id);
     if (!payment) {
@@ -107,7 +165,7 @@ router.put('/:id', auth, async (req, res) => {
     }
 
     // Update fields
-    payment.customerName = customerName;
+    payment.quotationId = quotationId;
     payment.amount = amount;
     payment.date = new Date(date);
     payment.status = status;

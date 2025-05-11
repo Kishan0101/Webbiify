@@ -1,8 +1,9 @@
 const mongoose = require('mongoose');
 
 const PaymentSchema = new mongoose.Schema({
-  customerName: {
-    type: String,
+  quotationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Quotation',
     required: true,
   },
   amount: {
