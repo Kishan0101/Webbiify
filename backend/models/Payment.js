@@ -1,11 +1,6 @@
 const mongoose = require('mongoose');
 
 const PaymentSchema = new mongoose.Schema({
-  quotationId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Quotation',
-    required: true,
-  },
   customerName: {
     type: String,
     required: true,
@@ -13,6 +8,7 @@ const PaymentSchema = new mongoose.Schema({
   amount: {
     type: Number,
     required: true,
+    min: 0,
   },
   date: {
     type: Date,
@@ -25,9 +21,11 @@ const PaymentSchema = new mongoose.Schema({
   },
   razorpayOrderId: {
     type: String,
+    required: false,
   },
   razorpayPaymentId: {
     type: String,
+    required: false,
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
